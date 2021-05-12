@@ -1,5 +1,4 @@
-from comet_ml import Experiment
-experiment = Experiment(auto_metric_logging=False)
+from ltr.comet_utils import CometLogger
 import torch
 from ltr.dataset import Lasot, MSCOCOSeq, Got10k, TrackingNet
 from ltr.data import processing, sampler, LTRLoader
@@ -37,6 +36,9 @@ def run(settings):
     settings.nheads = 8
     settings.dim_feedforward = 2048
     settings.featurefusion_layers = 4
+
+    # Comet Logger
+    comet_logger = CometLogger(settings.comet, auto_metric_logging=False)
 
     # Train datasets
     lasot_train = Lasot(settings.env.lasot_dir, split='train')
@@ -93,15 +95,15 @@ def run(settings):
     ]
 
     settings_dict = nested_to_record(vars(settings), sep='_')
-    experiment.log_others(settings_dict)
-    experiment.log_code("./lib/train/trainers/ltr_trainer.py")
+    comet_logger.log_others(settings_dict)
+    comet_logger.log_code("./lib/train/trainers/ltr_trainer.py")
 
     optimizer = torch.optim.AdamW(param_dicts, lr=1e-4,
                                   weight_decay=1e-4)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 500)
 
     # Create trainer
-    trainer = LTRTrainer(actor, [loader_train], optimizer, settings, lr_scheduler, experiment)
+    trainer = LTRTrainer(actor, [loader_train], optimizer, settings, lr_scheduler, comet_logger)
 
     # Run training (set fail_safe=False if you are debugging)
     trainer.train(1000, load_latest=True, fail_safe=True)
